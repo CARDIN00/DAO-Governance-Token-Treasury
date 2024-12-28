@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./disputeResolution.sol"; 
+import "./reward.sol";
 contract GovernanceToken is ERC20{
 
     uint public proposalCount;
@@ -12,14 +13,18 @@ contract GovernanceToken is ERC20{
     uint public quorumThreshold = 30; // Example: 30% of the total token supply must vote
     uint executionDelay = 3 days;
 
-    //dispute resolution contract
+    //Other contracts
     disputeResolution public disputeResolutionContract;
+    Rewarding public rewards;
 
 
-    constructor(uint initialSupply,address _disputeResolutionContract) ERC20("GovernanceToken","GOV"){
+    constructor(uint initialSupply,
+    address _disputeResolutionContract,
+    address _reward
+    ) ERC20("GovernanceToken","GOV"){
         _mint(msg.sender, initialSupply);
         disputeResolutionContract = disputeResolution(_disputeResolutionContract);
-        
+        rewards = Rewarding(_reward);
     }
 
     struct proposal{
@@ -50,6 +55,7 @@ contract GovernanceToken is ERC20{
     event modiedProposals(uint indexed  proposalId, string newDescription);
     event DisputeCreated(uint proposalId, address proposer, string reason);
     event DisputeResolved(uint proposalId, bool outcome);
+    event rewardDistributed( address indexed Rewarded, uint rewardAmount);
 
     // FUNCTIONS
     function createProposal(
@@ -97,6 +103,11 @@ contract GovernanceToken is ERC20{
         Proposals[proposalId].totalVotes++;
 
         votes[msg.sender][proposalId] = true;
+        
+        // Reward user
+        uint RewardedAmount = rewards.distributeReward(msg.sender);
+        rewards.distributeReward(msg.sender);
+        emit  rewardDistributed(msg.sender, RewardedAmount);
         emit  voted(msg.sender, proposalId, support);
     }
 
