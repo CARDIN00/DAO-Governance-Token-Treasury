@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
+import "./disputeResolution.sol"; 
 contract GovernanceToken is ERC20{
 
     uint public proposalCount;
@@ -12,9 +12,14 @@ contract GovernanceToken is ERC20{
     uint public quorumThreshold = 30; // Example: 30% of the total token supply must vote
     uint executionDelay = 3 days;
 
+    //dispute resolution contract
+    disputeResolution public disputeResolutionContract;
 
-    constructor(uint initialSupply) ERC20("GovernanceToken","GOV"){
+
+    constructor(uint initialSupply,address _disputeResolutionContract) ERC20("GovernanceToken","GOV"){
         _mint(msg.sender, initialSupply);
+        disputeResolutionContract = disputeResolution(_disputeResolutionContract);
+        
     }
 
     struct proposal{
@@ -43,6 +48,8 @@ contract GovernanceToken is ERC20{
     event proposalExicution(uint proposalId, bool exicuted);
     event CancleProposal(uint prosalId, address indexed proposer);
     event modiedProposals(uint indexed  proposalId, string newDescription);
+    event DisputeCreated(uint proposalId, address proposer, string reason);
+    event DisputeResolved(uint proposalId, bool outcome);
 
     // FUNCTIONS
     function createProposal(
@@ -105,6 +112,12 @@ contract GovernanceToken is ERC20{
         require(Proposals[proposalId].active ,"Already Finalized");
         require(block.timestamp >= Proposals[proposalId].endTime);
         require(prop.exicuted == false,"Already finalized");
+
+        (string memory dispureReason, bool disputeOutcome) =disputeResolutionContract.resolveDispute(proposalId);
+
+        if(!disputeOutcome){
+            revert(string(abi.encodePacked("Porposal exicution halted :", dispureReason))) ;
+        }
 
         uint quorumVotes =(totalSupply() * quorumThreshold)/100;
         require(prop.totalVotes >quorumVotes,"not enough votes");
@@ -189,5 +202,12 @@ contract GovernanceToken is ERC20{
 
         emit modiedProposals(_proposalId, _description);
     }
+
+    // DISPUTE FUNCTIONS
+    function createDispute(uint _proposalId, string memory _reason)external {
+        require(bytes(_reason).length > 0,"Enter Reason");
+        disputeResolutionContract.createDispute(_proposalId, _reason);
+    }
+
 
 }
